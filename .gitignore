@@ -1,0 +1,43 @@
+# --- Python ---
+# Esclude i file compilati e le cache di esecuzione
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+dist/
+build/
+*.so
+
+# --- Dati e Dataset (Privacy e Performance) ---
+# Escludiamo i file CSV pesanti e i dati processati
+# Il professore genererà questi file eseguendo i tuoi script
+data/raw/*.csv
+data/processed/*.csv
+!data/processed/.gitkeep
+
+# --- Modelli di Machine Learning ---
+# I modelli salvati (.joblib o .pkl) possono essere pesanti
+# Verranno rigenerati dallo script 03 sul PC del docente
+*.joblib
+*.pkl
+models/
+
+# --- Risultati e Output Locali ---
+# Escludiamo i report e i grafici generati localmente
+# Questo permette al docente di verificare che il codice funzioni producendone di nuovi
+results/*.csv
+results/*.png
+results/visualizations/*.png
+
+# --- Configurazioni IDE e Sistema ---
+# Esclude impostazioni personali di editor e file spazzatura del sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints
