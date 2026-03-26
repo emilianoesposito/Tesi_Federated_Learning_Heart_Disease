@@ -1,8 +1,8 @@
 # utils/federated_data_splitter.py
 # -*- coding: utf-8 -*-
 """
-Federated data splitter for Veneto employment centers.
-Splits training dataset by geographic regions based on candidate residence areas.
+Federated data splitter per il dataset cardiaco.
+Divide il dataset in 5 ospedali simulati con proporzioni differenti.
 """
 
 import pandas as pd
@@ -12,308 +12,119 @@ from typing import Dict, Tuple
 import logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
-class VenetoFederatedSplitter:
+class CardiacFederatedSplitter:
     """
-    Geographic data splitter for Veneto region employment centers.
-    
-    Divides training dataset into regional subsets based on candidate 
-    residence areas, simulating real-world federated learning scenario
-    where each Employment Center (CPI) has access only to local data.
+    Splitter per simulare la distribuzione dei dati tra 5 ospedali.
+    Utilizza un partizionamento probabilistico per riflettere le diverse dimensioni dei nodi.
     """
+
+    def __init__(self, output_dir='data/federated'):
+        self.output_dir = output_dir
+        self.nodes_config = {
+            'Ospedale_Roma': 0.35,    # 35% dei dati
+            'Ospedale_Milano': 0.20,  # 20% dei dati
+            'Ospedale_Napoli': 0.20,  # 20% dei dati
+            'Ospedale_Firenze': 0.15, # 15% dei dati
+            'Ospedale_Rimini': 0.10   # 10% dei dati
+        }
+
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+    def split_proportionally(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        """
+        Divide il dataframe in base alle proporzioni definite in nodes_config. 
+        """
+        logger.info(f"Avvio partizionamento su {len(df)} record totali...")
+
+        # Mischiamo i dati per garantire una distribuzione casuale tra gli ospedali
+        df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+        hospital_datasets = {}
+        start_idx = 0
+
+        for node_name, proportion in self.nodes_config.items():
+            # Calcolo numero di campioni per questo ospedale
+            num_samples = int(len(df_shuffled) * proportion)
+            end_idx = start_idx + num_samples
+
+            # Estrazione del subset
+            node_df = df_shuffled.iloc[start_idx:end_idx].copy()
+            hospital_datasets[node_name] = node_df
+
+            start_idx = end_idx
+            logger.info(f"Assegnati {len(node_df)} record a {node_name}")
+        
+        return hospital_datasets
     
-    def __init__(self):
-        self.regions = {
-            'CPI_Verona': ['Verona', 'Villafranca', 'Legnago', 'San Bonifacio', 'Isola della Scala'],
-            'CPI_Vicenza': ['Vicenza', 'Bassano', 'Thiene', 'Arzignano', 'Schio'],
-            'CPI_Padova': ['Padova', 'Cittadella', 'Piove di Sacco', 'Camposampiero', 'Este'],
-            'CPI_Treviso': ['Treviso', 'Castelfranco', 'Conegliano', 'Montebelluna', 'Oderzo'],
-            'CPI_Venezia': ['Venezia', 'Mestre', 'Portogruaro', 'San DonÃ  di Piave', 'Chioggia']
-        }
-        
-        # Create reverse mapping for quick lookup
-        self.city_to_region = {}
-        for region, cities in self.regions.items():
-            for city in cities:
-                self.city_to_region[city.lower()] = region
-        
-        # Define realistic population weights for simulation
-        self.city_population_weights = {
-            # Verona province
-            'Verona': 0.15, 'Villafranca': 0.04, 'Legnago': 0.025,
-            'San Bonifacio': 0.02, 'Isola della Scala': 0.015,
-            
-            # Vicenza province  
-            'Vicenza': 0.12, 'Bassano': 0.05, 'Thiene': 0.035,
-            'Arzignano': 0.03, 'Schio': 0.025,
-            
-            # Padova province
-            'Padova': 0.18, 'Cittadella': 0.035, 'Piove di Sacco': 0.025,
-            'Camposampiero': 0.02, 'Este': 0.015,
-            
-            # Treviso province
-            'Treviso': 0.10, 'Castelfranco': 0.035, 'Conegliano': 0.03,
-            'Montebelluna': 0.025, 'Oderzo': 0.015,
-            
-            # Venezia province
-            'Venezia': 0.06, 'Mestre': 0.09, 'Portogruaro': 0.02,
-            'San DonÃ  di Piave': 0.025, 'Chioggia': 0.015
-        }
-                
-        logger.info(f"Initialized splitter with {len(self.regions)} regions and {len(self.city_to_region)} cities")
+    def save_hospital_datasets(self, hospital_datasets: Dict[str, pd.DataFrame]):
+        """Salva ogni dataset ospedaliero in un file CSV separato."""
+        for hospital, df in hospital_datasets.items():
+            filename = f"{hospital}_training_data.csv"
+            filepath = os.path.join(self.output_dir, filename)
+            df.to_csv(filepath, index=False)
+            logger.debug(f"Salvato {hospital} in {filepath}")
+        logger.info(f"Tutti i {len(hospital_datasets)} file CSV sono stati salvati in {self.output_dir}")
 
-    def _extract_city_from_address(self, address: str) -> str:
+    def get_hospital_statistics(self, hospital_datasets: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         """
-        Extract city name from address string.
-        
-        Args:
-            address: Full address string
-            
-        Returns:
-            Extracted city name or 'Unknown' if not found
+        Genera la tabella riassuntiva della distribuzione.
         """
-        if pd.isna(address) or not isinstance(address, str):
-            return 'Unknown'
-            
-        address_clean = address.lower().strip()
-        
-        # Try to match known cities
-        for city in self.city_to_region.keys():
-            if city in address_clean:
-                return city.title()
-                
-        return 'Unknown'
+        stats= []
+        total_records = sum(len(df) for df in hospital_datasets.values())
 
-    def _assign_region(self, city: str) -> str:
-        """
-        Assign region based on city name.
-        
-        Args:
-            city: City name
-            
-        Returns:
-            Region name or 'CPI_Unknown' if city not found
-        """
-        city_lower = city.lower()
-        return self.city_to_region.get(city_lower, 'CPI_Unknown')
+        for hospital, df in hospital_datasets.items():
+            count = len(df)
+            percentuale = (count / total_records) * 100
+            # Calcolo prevalenza patologia (target_label = 1)
+            positive_cases = df['target_label'].sum() if 'target_label' in df.columns else 0
+            prevalenza = (positive_cases / count) * 100 if count > 0 else 0
 
-    def split_by_geography(self, df_train: pd.DataFrame, 
-                          address_column: str = 'candidate_residence',
-                          min_samples_per_region: int = 1000) -> Dict[str, pd.DataFrame]:
-        """
-        Split training dataset by geographic regions.
+            stats.append({
+                'Nodo (Ospedale)': hospital,
+                'Record Totali': count,
+                '% sul Totale': f"{percentuale:.1f}%",
+                'Casi Positivi': int(positive_cases),
+                'Prevalenza Malattia': f"{prevalenza:.1f}%" 
+            })
         
-        Args:
-            df_train: Training dataset with candidate-company pairs
-            address_column: Column name containing residence addresses
-            min_samples_per_region: Minimum samples required per region
-            
-        Returns:
-            Dictionary mapping region names to regional datasets
-        """
-        logger.info(f"Starting geographic split of {len(df_train)} training samples")
-        
-        # Create copy to avoid modifying original data
-        df_work = df_train.copy()
-        
-        # Extract city information (simulate from existing data)
-        if address_column not in df_work.columns:
-            logger.warning(f"Address column '{address_column}' not found. Simulating geographic distribution.")
-            df_work = self._simulate_geographic_distribution(df_work)
-        
-        # Extract cities and assign regions
-        df_work['city'] = df_work[address_column].apply(self._extract_city_from_address)
-        df_work['region'] = df_work['city'].apply(self._assign_region)
-        
-        # Split into regional datasets
-        regional_datasets = {}
-        region_stats = {}
-        
-        for region in self.regions.keys():
-            region_data = df_work[df_work['region'] == region].copy()
-            
-            if len(region_data) >= min_samples_per_region:
-                # Remove helper columns before saving
-                region_data = region_data.drop(columns=['city', 'region', 'candidate_residence'], errors='ignore')
-                regional_datasets[region] = region_data
-                region_stats[region] = len(region_data)
-                logger.info(f"{region}: {len(region_data)} samples")
-            else:
-                logger.warning(f"{region}: {len(region_data)} samples (below minimum {min_samples_per_region})")
-        
-        # Handle unknown region
-        unknown_data = df_work[df_work['region'] == 'CPI_Unknown']
-        if len(unknown_data) > 0:
-            unknown_clean = unknown_data.drop(columns=['city', 'region', 'candidate_residence'], errors='ignore')
-            regional_datasets['CPI_Unknown'] = unknown_clean
-            region_stats['CPI_Unknown'] = len(unknown_data)
-            logger.info(f"CPI_Unknown: {len(unknown_data)} samples")
-        
-        # Print summary statistics
-        total_assigned = sum(region_stats.values())
-        logger.info(f"Split summary: {total_assigned}/{len(df_train)} samples assigned to {len(regional_datasets)} regions")
-        
-        return regional_datasets
-
-    def _simulate_geographic_distribution(self, df_train: pd.DataFrame) -> pd.DataFrame:
-        """
-        Simulate geographic distribution for existing training data.
-        
-        Args:
-            df_train: Training dataset
-            
-        Returns:
-            Dataset with simulated residence addresses
-        """
-        logger.info("Simulating geographic distribution based on Veneto demographics")
-        
-        df_sim = df_train.copy()
-        n_samples = len(df_sim)
-        
-        # Use predefined population weights
-        cities = list(self.city_population_weights.keys())
-        weights = list(self.city_population_weights.values())
-        
-        # Normalize weights to ensure they sum to exactly 1.0
-        weights = np.array(weights, dtype=float)
-        weights = weights / weights.sum()
-        
-        # Verify weights sum to 1
-        weights_sum = weights.sum()
-        logger.info(f"Population weights sum: {weights_sum:.8f}")
-        
-        if abs(weights_sum - 1.0) > 1e-10:
-            logger.warning(f"Weights sum deviation: {abs(weights_sum - 1.0):.2e}")
-            # Force exact normalization
-            weights[-1] = 1.0 - weights[:-1].sum()
-            logger.info(f"After correction, weights sum: {weights.sum():.8f}")
-        
-        # Sample cities according to weights
-        np.random.seed(42)  # For reproducibility
-        sampled_cities = np.random.choice(cities, size=n_samples, p=weights)
-        
-        # Create realistic addresses
-        df_sim['candidate_residence'] = [f"{city}, Veneto, Italy" for city in sampled_cities]
-        
-        # Log distribution
-        city_counts = pd.Series(sampled_cities).value_counts()
-        logger.info(f"Generated geographic distribution for {n_samples} samples")
-        logger.info("Top 5 cities by sample count:")
-        for city, count in city_counts.head().items():
-            percentage = (count / n_samples) * 100
-            logger.info(f"  {city}: {count} samples ({percentage:.1f}%)")
-        
-        return df_sim
-
-    def get_region_statistics(self, regional_datasets: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-        """
-        Generate statistics about regional data distribution.
-        
-        Args:
-            regional_datasets: Dictionary of regional datasets
-            
-        Returns:
-            DataFrame with regional statistics
-        """
-        stats_data = []
-        
-        for region, dataset in regional_datasets.items():
-            if len(dataset) > 0:
-                stats = {
-                    'Region': region,
-                    'Total_Samples': len(dataset),
-                    'Positive_Matches': dataset['outcome'].sum() if 'outcome' in dataset.columns else 0,
-                    'Match_Rate': dataset['outcome'].mean() if 'outcome' in dataset.columns else 0,
-                    'Avg_Distance_KM': dataset['distance_km'].mean() if 'distance_km' in dataset.columns else 0,
-                    'Avg_Attitude_Score': dataset['attitude_score'].mean() if 'attitude_score' in dataset.columns else 0
-                }
-                stats_data.append(stats)
-        
-        stats_df = pd.DataFrame(stats_data)
-        return stats_df.round(3)
-
-    def save_regional_datasets(self, regional_datasets: Dict[str, pd.DataFrame], 
-                             output_dir: str = 'data/federated') -> None:
-        """
-        Save regional datasets to separate files.
-        
-        Args:
-            regional_datasets: Dictionary of regional datasets
-            output_dir: Output directory for regional datasets
-        """
-        os.makedirs(output_dir, exist_ok=True)
-        
-        for region, dataset in regional_datasets.items():
-            filepath = os.path.join(output_dir, f"{region}_training_data.csv")
-            dataset.to_csv(filepath, index=False)
-            logger.info(f"Saved {region}: {len(dataset)} samples to {filepath}")
-        
-        # Save region statistics
-        stats_df = self.get_region_statistics(regional_datasets)
-        stats_path = os.path.join(output_dir, 'regional_statistics.csv')
-        stats_df.to_csv(stats_path, index=False)
-        logger.info(f"Saved regional statistics to {stats_path}")
-
-    def load_regional_datasets(self, input_dir: str = 'data/federated') -> Dict[str, pd.DataFrame]:
-        """
-        Load previously saved regional datasets.
-        
-        Args:
-            input_dir: Directory containing regional datasets
-            
-        Returns:
-            Dictionary of regional datasets
-        """
-        regional_datasets = {}
-        
-        if not os.path.exists(input_dir):
-            logger.error(f"Input directory {input_dir} does not exist")
-            return regional_datasets
-        
-        for region in self.regions.keys():
-            filepath = os.path.join(input_dir, f"{region}_training_data.csv")
-            if os.path.exists(filepath):
-                dataset = pd.read_csv(filepath)
-                regional_datasets[region] = dataset
-                logger.info(f"Loaded {region}: {len(dataset)} samples from {filepath}")
-            else:
-                logger.warning(f"File not found: {filepath}")
-        
-        return regional_datasets
-
+        return pd.DataFrame(stats)
 
 def main():
     """
-    Test function for the federated splitter.
+    Esecuzione stand-alone per generare i dati e mostrarli in tabella.
     """
-    # This would be called from the main federated training script
-    logger.info("Testing VenetoFederatedSplitter...")
-    
-    splitter = VenetoFederatedSplitter()
-    
-    # Load training data (example)
+    print("\n" + "="*50)
+    print("🏥 CARDIAC FEDERATED DATA SPLITTER")
+    print("="*50)
+
+    splitter = CardiacFederatedSplitter()
+
+    # Percorso del dataset generato dallo script 01_generate_dataset.py
     training_file = 'data/processed/Enhanced_Training_Dataset.csv'
+
     if os.path.exists(training_file):
         df_train = pd.read_csv(training_file)
-        logger.info(f"Loaded training data: {len(df_train)} samples")
-        
-        # Split by geography
-        regional_datasets = splitter.split_by_geography(df_train)
-        
-        # Save regional datasets
-        splitter.save_regional_datasets(regional_datasets)
-        
-        # Show statistics
-        stats_df = splitter.get_region_statistics(regional_datasets)
-        print("\nRegional Statistics:")
-        print(stats_df.to_string(index=False))
-        
-    else:
-        logger.error(f"Training file not found: {training_file}")
 
+        # 1. Divisione dei dati
+        hospital_datasets = splitter.split_proportionally(df_train)
+
+        # 2. Salvataggio CSV
+        splitter.save_hospital_datasets(hospital_datasets)
+
+        # 3. Generazione e stampa tabella
+        stats_df = splitter.get_hospital_statistics(hospital_datasets)
+
+        print("\n📊 DISTRIBUZIONE RECORD PER NODO:")
+        print("-" * 75)
+        print(stats_df.to_string(index=False))
+        print("-" * 75)
+        print(f"Dataset totale processato: {len(df_train)} record\n")
+    else:
+        logger.error(f"File {training_file} non trovato. Esegui prima lo script 01_generate_dataset.py")
 
 if __name__ == "__main__":
     main()

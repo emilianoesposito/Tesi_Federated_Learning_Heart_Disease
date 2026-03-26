@@ -16,6 +16,8 @@ build/
 data/raw/*.csv
 data/processed/*.csv
 !data/processed/.gitkeep
+data/federated/*.csv
+
 
 # --- Modelli di Machine Learning ---
 # I modelli salvati (.joblib o .pkl) possono essere pesanti

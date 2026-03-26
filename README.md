@@ -73,4 +73,25 @@ MLP (Rete Neurale), 83.61%,    0.7917,    0.9048
 - **Visualizzazione:** Matplotlib, Seaborn.
 - **Sicurezza e Privacy:** Federated Learning, Shamir Secret Sharing, Blockchain Anchoring (Merkle Tree).
 
+## 🏥 Estensione Federated Learning (Punto 3, In Corso)
+Il sistema è stato evoluto verso un'architettura **distribuita** per simulare la frammentazione dei dati tra diversi enti sanitari. Il dataset centrale è stato partizionato in 5 nodi ospedalieri tramite lo script 'utils/frderated_data_splitter.py'.
+
+### Partizionamento dei Nodi (Distribuzione Non-IID)
+La suddivisione segue una logica quantitativa per testare la robustezza del modello su centri di diverse dimensioni:
+
+| Nodo Federato | Tipologia Centro | Quota Dati |
+| :--- | :--- | :--- |
+| **Ospedale Roma** | Hub Principale | 35% |
+| **Ospedale Milano** | Centro Regionale | 20% |
+| **Ospedale Napoli** | Centro Regionale | 20% |
+| **Ospedale Firenze** | Centro Regionale | 15% |
+| **Ospedale Rimini** | Presidio Territoriale | 10% |
+
+### Dettagli Tecnici dello Splitter
+Il modulo 'CardiacFederatedSplitter' implementa:
+1. **Separazione Fisica**: Creazione di 5 file '.csv' indipendenti nella directory 'data/federated/' simulando database locali isolati.
+2. **Analisi della Distribuzione**: Calcolo automaatico della prevalenza della patologia per ogni nodo per validare l'eterogeneità del target.
+3. **Pipeline Integrata**: Lo splitter prepara i dati necessari per l'esecuzione del training federato tramite '05_LightGBM_federated_training.py'.
+
+
 
