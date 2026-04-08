@@ -3,8 +3,8 @@
 """
 Script: 02_visualize_dataset.py
 Description: Esegue l'analisi visiva del dataset Heart Disease UCI processato.
-             Genera grafici sulla distribuzione delle patologie e correlazioni cliniche.
-Output: Plot PNG in 'results/visualizations/' e riepiloghi statistici.
+             Sfrutta le utility centralizzate per generare grafici ad alta risoluzione.
+Output: Plot PNG in 'results/visualizations/'
 """
 
 import sys 
@@ -14,41 +14,42 @@ import pandas as pd
 # Aggiunge la root del progetto al sys.path per importare le utility
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Importiamo le funzioni dalla tua cartella utils
 from utils.visualization import visualize_distribution, visualize_correlations
 
-# Percorso del dataset generato dallo script 01
+# Percorsi configurati
 TRAINING_DATA_PATH = "data/processed/Enhanced_Training_Dataset.csv"
 OUTPUT_DIR = "results/visualizations"
 
 def main():
-    # Verifica l'esistenza del file
+    # 1. Verifica l'esistenza del dataset prodotto dallo script 01
     if not os.path.exists(TRAINING_DATA_PATH):
         print(f"❌ Errore: Dataset non trovato in {TRAINING_DATA_PATH}")
         print("💡 Esegui prima 'python scripts/01_generate_dataset.py'")
-        exit(1)
+        sys.exit(1)
 
-    # Assicura l'esistenza della cartella di output
+    # 2. Assicura l'esistenza della cartella di output per la tesi
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    # 3. Caricamento dati
     print("📊 Caricamento dei dati clinici per analisi visiva...")
     df = pd.read_csv(TRAINING_DATA_PATH)
 
-    # Stampa un'anteprima delle feature (Analisi feature)
-    print(f"✅ Caricati {df.shape[0]} record con {df.shape[1]} variabili.")
+    # Riepilogo rapido a terminale
+    print(f"✅ Caricati {df.shape[0]} record con {df.shape[1]} variabili cliniche.")
     print(f"🩺 Variabili rilevate: {', '.join(df.columns.tolist())}")
 
-    print("📈 Generazione grafici di distribuzione e bilanciamento target...")
-    # Questa funzione mostrerà il bilanciamento tra Sani (0) e Malati (1)
-    visualize_distribution(df)
+    # 4. Generazione Grafici tramite UTILS
+    
+    # Visualizzazione del bilanciamento del Target (Sani vs Malati)
+    print("📈 Generazione grafico distribuzione target...")
+    visualize_distribution(df, save_dir=OUTPUT_DIR)
 
-    print("🔗 Analisi delle correlazioni tra parametri clinici (es. Colesterolo vs Target)...")
-    # Questa funzione genererà una heatmap delle correlazioni
-    visualize_correlations(df)
+    # Analisi delle correlazioni (es. Colesterolo, Pressione, Età rispetto al Target)
+    print("🔗 Generazione heatmap delle correlazioni cliniche...")
+    visualize_correlations(df, save_dir=OUTPUT_DIR)
 
-    print("-" * 30)
-    print(f"✅ Visualizzazioni salvate nella cartella: {OUTPUT_DIR}")
-    print("💡 Controlla il grafico del target per verificare la necessità di SMOTE.")
-    print("-" * 30)
+    print(f"\n✨ Visualizzazione completata. I grafici per la tesi sono disponibili in: {OUTPUT_DIR}")
 
 if __name__ == "__main__":
     main()

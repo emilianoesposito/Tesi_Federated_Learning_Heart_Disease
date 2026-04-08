@@ -1,97 +1,61 @@
-# Privacy-Preserving Cardiac Monitoring: Federated Learning & Blockchain
-_Progetto di Tesi di Laurea in Ingegneria Informatica (CyberSecurity)_
+# Privacy-Preserving Cardiac Monitoring
+_Architettura Federata con Privacy Differenziale, Shamir's Secret Sharing e Notarizzazione Blockchain_
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Baseline%20Validated-success" />
-  <img src="https://img.shields.io/badge/Dataset-UCI%20Heart%20Disease-blue" />
-  <img src="https://img.shields.io/badge/Algorithm-LightGBM%20%7C%20MLP-orange" />
-  <img src="https://img.shields.io/badge/Privacy-Federated%20Learning-purple" />
+  <img src="https://img.shields.io/badge/Status-Project%20Completed-success" />
+  <img src="https://img.shields.io/badge/AI-Federated%20Learning-blueviolet" />
+  <img src="https://img.shields.io/badge/Privacy-Differential%20Privacy-green" />
+  <img src="https://img.shields.io/badge/Security-Shamir%20SSS-orange" />
+  <img src="https://img.shields.io/badge/Integrity-Blockchain-blue" />
 </p>
 
-> **Executive Summary.** Questo progetto sviluppa un'architettura di intelligenza artificiale per il monitoraggio preventivo delle patologie cardiache. Il sistema affronta le sfide della privacy e dell'integrità dei dati sanitari integrando il **Federated Learning**, che permette l'addestramento distribuito senza condivisione di dati grezzi, e la **Blockchain** per la notarizzazione immutabile dei risultati diagnostici.
+## 🚀 Panoramica del Progetto
+Questo progetto sviluppa un sistema avanzato di monitoraggio cardiaco che risolve il conflitto tra analisi dei dati (AI) e riservatezza del paziente (GDPR). Invece di centralizzare dati sensibili, il sistema utilizza il **Federated Learning** per addestrare i modelli localmente negli ospedali, proteggendo i pesi con **Privacy Differenziale** e garantendo l'integrità tramite **Blockchain**.
 
-## 📑 Indice
-- [Obiettivi del Progetto](#obiettivi-del-progetto)
-- [Struttura del Repository](#struttura-del-repository)
-- [Installazione e Setup](#installazione-e-setup)
-- [Pipeline di Esecuzione (Baseline)](#pipeline-di-esecuzione-baseline)
-- [Risultati della Baseline (Punto 2)](#risultati-della-baseline-punto-2)
-- [Tecnologie Utilizzate](#tecnologie-utilizzate)
+## 🛠️ Architettura Tecnica
+Il sistema si basa su tre pilastri fondamentali:
+1. **Federated Learning (Non-IID)**: Simulazione di 5 nodi ospedalieri con distribuzioni di dati eterogenee.
+2. **Secure Aggregation & DP**: Protocollo basato su *Shamir's Secret Sharing* per l'aggregazione dei pesi e rumore di Laplace (Differential Privacy) per l'anonimizzazione.
+3. **Blockchain Anchoring**: Notarizzazione del *Merkle Root* dei record clinici per garantire l'immutabilità dei log diagnostici.
 
-## 🎯 Obiettivi del Progetto
-1.  **Analisi Clinica (Punto 1):** Mapping e binarizzazione del dataset Heart Disease UCI (Cleveland) per lo screening cardiaco preventivo.
-2.  **Baseline Centralizzata (Punto 2):** Definizione del "Gold Standard" prestazionale tramite modelli MLP e LightGBM con bilanciamento SMOTE.
-3.  **Partizione Federata (Punto 3):** Simulazione di 5 nodi ospedalieri con distribuzioni di dati non-IID (In corso).
-4.  **Privacy & Integrità (Punto 4):** Implementazione di aggregazione sicura (Shamir Secret Sharing) e notarizzazione tramite Merkle Tree.
+## 📂 Struttura della Pipeline
+Eseguire gli script in ordine numerico per replicare l'intero esperimento:
 
-## 📂 Struttura del Repository
-* **`data/`**: Contiene il dataset originale e i dati processati.
-* **`results/`**: Output generati (metriche, grafici comparativi e modelli salvati).
-* **`scripts/`**: Pipeline sperimentale (Preprocessing, Training Baseline, Analisi).
-* **`utils/`**: Logica di core (Scoring clinico, Feature Engineering, Visualizzazione).
-* **`venv/`**: Ambiente virtuale Python (escluso dal controllo di versione).
-* **`download_dataset.py`**: Script per il recupero del dataset Heart Disease UCI.
-* **`requirements.txt`**: Elenco delle dipendenze necessarie con versioni verificate.
-* **`.gitignore`**: Configurazione per l'esclusione di file temporanei e dati sensibili.
+1. `01_generate_dataset.py`: Preparazione dati e split federato tra i nodi.
+2. `02_visualize_dataset.py`: Analisi esplorativa dei dati (EDA).
+3. `03_train_models.py`: Training della Baseline centralizzata (LightGBM vs MLP).
+4. `05_LightGBM_federated_training.py`: Addestramento federato tramite LightGBM.
+5. `06_LightGBM_federated_visualization.py`: Visualizzazione della distribuzione Non-IID tra gli ospedali.
+6. `07_mlp_federated_training.py`: Preparazione dei modelli MLP per l'aggregazione sicura.
+7. `08_mlp_federated_privacy.py`: **[CORE]** Aggregazione sicura con Shamir e Privacy Differenziale.
+8. `09_mlp_federated_privacy_visualization.py`: Analisi del trade-off tra Utilità e Privacy.
+9. `10_blockchain_anchoring_bench.py`: Benchmark di scalabilità della notarizzazione Blockchain.
 
-## 🛠️ Installazione e Setup
-1. **Clonazione del repository:**
-   ```bash
-   git clone <url-del-tuo-repo-github>
-   cd <nome-cartella-repo>
+## 📈 Risultati Ottenuti
+I test eseguiti sul dataset UCI Heart Disease hanno prodotto i seguenti risultati:
 
-2. **Attivazione ambiente virtuale:**
-   ```bash
-   # Windows
-   venv\Scripts\activate
-   # Linux/Mac
-   source venv/bin/activate
+| Scenario | Modello | Accuracy | F1-Score |
+| :--- | :--- | :--- | :--- |
+| **Centralizzato** | MLP (Baseline) | **83.6%** | **84.4%** |
+| **Federato** | MLP (No Privacy) | 81.6% | 81.4% |
+| **Sicuro** | MLP (DP + Shamir) | 77.6% | 76.4% |
 
-3. **Installazione dipendenze:**
-   ```bash
-   pip install -r requirements.txt
+**Nota sulla Privacy:** Il calo di circa il 6% nell'accuratezza è il "costo della privacy" (Epsilon=1.0), necessario per garantire che nessun dato individuale possa essere estratto dal modello globale.
 
-## 🚀 Pipeline di Esecuzione (Baseline)
-Per replicare i risultati della Baseline (Punti 1 e 2), eseguire gli script in sequenza dal terminale:
-1. Download Dati: python download_dataset.py
-2. Preprocessing: python scripts/01_generate_dataset.py
-3. Visualizzazione: python scripts/02_visualize_dataset.py
-4. Training: python scripts/03_train_models.py (Applica lo SMOTE per il bilanciamento).
-5. Analisi: python scripts/04_analyze_results.py (Genera il confronto finale delle metriche).
+## 🔗 Performance Blockchain
+Il sistema di notarizzazione ha dimostrato un'altissima efficienza:
+- **Tempo di notarizzazione (303 record)**: < 0.005s.
+- **Scalabilità**: < 0.1s per 10.000 record clinici.
+- **Impatto CPU**: ~0.0% (operazione estremamente leggera).
 
-## 📊 Risultati della Baseline (Punto 2)
-Le prestazioni ottenute in modalità centralizzata rappresentano il **Gold Standard** per la successiva fase federata:
-Modello,            Accuracy,  F1-Score,  ROC-AUC
-LightGBM,           86.89%,    0.8667,    0.9545
-MLP (Rete Neurale), 83.61%,    0.7917,    0.9048
+## ⚙️ Setup e Installazione
+```bash
+# Clone del repository
+git clone [URL_DEL_TUO_REPO]
 
-**Nota:**Il modello **LightGBM** si conferma il più efficace per gestire dati clinici tabellari di piccole dimensioni. L'architettura **MLP**, pur avendo prestazioni leggermente inferiori, garantisce la compatibilità nativa con l'aggregazione dei pesi necessaria per il Federated Learning.
+# Creazione ambiente virtuale
+python -m venv venv
+source venv/bin/activate  # Su Windows: venv\Scripts\activate
 
-## 🔬 Tecnologie Utilizzate
-- **Machine Learning:** Scikit-Learn (MLP), LightGBM.
-- **Data Prep & Analysis:** Pandas, NumPy, Imbalanced-Learn (SMOTE).
-- **Visualizzazione:** Matplotlib, Seaborn.
-- **Sicurezza e Privacy:** Federated Learning, Shamir Secret Sharing, Blockchain Anchoring (Merkle Tree).
-
-## 🏥 Estensione Federated Learning (Punto 3, In Corso)
-Il sistema è stato evoluto verso un'architettura **distribuita** per simulare la frammentazione dei dati tra diversi enti sanitari. Il dataset centrale è stato partizionato in 5 nodi ospedalieri tramite lo script 'utils/frderated_data_splitter.py'.
-
-### Partizionamento dei Nodi (Distribuzione Non-IID)
-La suddivisione segue una logica quantitativa per testare la robustezza del modello su centri di diverse dimensioni:
-
-| Nodo Federato | Tipologia Centro | Quota Dati |
-| :--- | :--- | :--- |
-| **Ospedale Roma** | Hub Principale | 35% |
-| **Ospedale Milano** | Centro Regionale | 20% |
-| **Ospedale Napoli** | Centro Regionale | 20% |
-| **Ospedale Firenze** | Centro Regionale | 15% |
-| **Ospedale Rimini** | Presidio Territoriale | 10% |
-
-### Dettagli Tecnici dello Splitter
-Il modulo 'CardiacFederatedSplitter' implementa:
-1. **Separazione Fisica**: Creazione di 5 file '.csv' indipendenti nella directory 'data/federated/' simulando database locali isolati.
-2. **Analisi della Distribuzione**: Calcolo automaatico della prevalenza della patologia per ogni nodo per validare l'eterogeneità del target.
-3. **Pipeline Integrata**: Lo splitter prepara i dati necessari per l'esecuzione del training federato tramite '05_LightGBM_federated_training.py'.
-
-
-
+# Installazione dipendenze
+pip install -r requirements.txt

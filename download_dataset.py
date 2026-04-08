@@ -28,7 +28,7 @@ def download_and_prepare_uci_data():
         # Riempiamo i pochi NA con la mediana per non perdere record preziosi
         df = df.fillna(df.median())
 
-        # 3. Rinominazione colonne per il sistema (Analisi e Adattamento - Punto 1 Prof)
+        # 3. Rinominazione colonne per il sistema (Analisi e Adattamento - Punto 1)
         # Mappiamo i nomi originali verso quelli usati nei tuoi script 01-04
         mapping = {
             'age': 'eta',

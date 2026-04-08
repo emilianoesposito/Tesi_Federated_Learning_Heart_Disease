@@ -2,58 +2,62 @@
 # -*- coding: utf-8 -*-
 """
 Script: 01_generate_dataset.py
-Description: Carica il dataset Heart Disease UCI, applica il mapping delle feature 
-             e genera il dataset processato per la Baseline
+Description: Carica il dataset Heart Disease UCI, applica il mapping clinico tramite scoring.py
+             e ripartisce i dati tra i 5 nodi ospedalieri tramite federated_data_splitter.py.
 Output:
-  - data/processed/Enhanced_Training_Dataset.csv
+  - data/processed/Enhanced_Training_Dataset.csv (Dataset per Baseline)
+  - data/federated/Ospedale_*.csv (Dataset per training federato)
 """
 
 import os
 import sys
 import pandas as pd
 
-# Aggiunge la root del progetto al sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# Importa lo scorer adattato per i dati UCI
 from utils.scoring import ClinicalRiskScorer
-
-# Definizione percorsi (Analisi e Adattamento)
-RAW_DATA_PATH = "data/raw/Dataset_Pazienti.csv"
-TRAINING_DATA_PATH = "data/processed/Enhanced_Training_Dataset.csv"
+from utils.federated_data_splitter import CardiacFederatedSplitter
 
 def main():
-    # Verifica esistenza cartelle
-    os.makedirs("data/processed", exist_ok=True)
-
-    # Step 1: Caricamento dati reali UCI (Cleveland Dataset)
-    if not os.path.exists(RAW_DATA_PATH):
-        print("❌ Errore: Dataset non trovato in {RAW_DATA_PATH}. Esegui prima lo script di download.")
-        return
+    print("🚀 Script 01: Rigenerazione Dataset con Header...")
     
-    print("📥 Caricamento dataset Heart DIsease UCI...")
-    df_raw = pd.read_csv(RAW_DATA_PATH) 
-
-    # Step 2: Adattamento e binarizzazione del target
-    # Utilizziamo la classe ClinicalRiskScorer per documentare la corrispondenza
-    print("🔧 Analisi e adattamento delle 13 variabili cliniche...")
+    raw_path = "data/raw/Dataset_Pazienti.csv"
+    if not os.path.exists(raw_path):
+        print(f"❌ Errore: Manca {raw_path}")
+        return
+        
+    df_raw = pd.read_csv(raw_path)
+    
+    # 2. Trasformazione
     scorer = ClinicalRiskScorer()
-
-    # Il metodo compute_risk_scores ora gestisce il mapping:
-    # age -> eta, trestbps -> pressione, chol -> colesterolo, ecc.
     df_processed = scorer.compute_risk_scores(df_raw)
-
-    # Step 3: Salvataggio del dataset per la Baseline
-    print(f"🧠 Generazione dataset per training (N. record: {len(df_processed)})...")
-
-    # Salvataggio finale
-    df_processed.to_csv(TRAINING_DATA_PATH, index=False) 
-
-    print("-" * 30)
-    print(f"✅ Baseline Dataset salvato: {TRAINING_DATA_PATH}")
-    print(f"📊 Feature rilevate: {list(df_processed.columns)}")
-    print("-" * 30)
+    
+    # 3. Salvataggio Centralizzato
+    os.makedirs("data/processed", exist_ok=True)
+    df_processed.to_csv("data/processed/Enhanced_Training_Dataset.csv", index=False)
+    
+    # 4. Split Federato (Assicuriamoci che mantenga i nomi colonne)
+    print("🏥 Ripartizione in corso...")
+    splitter = CardiacFederatedSplitter()
+    splitter.split_data(df_processed) 
+    
+    # FORZIAMO il controllo: se i file creati non hanno header, li sovrascriviamo
+    hospitals = ['Ospedale_Roma', 'Ospedale_Milano', 'Ospedale_Napoli', 'Ospedale_Firenze', 'Ospedale_Rimini']
+    for h in hospitals:
+        path = f"data/federated/{h}_training_data.csv"
+        if os.path.exists(path):
+            temp_df = pd.read_csv(path)
+            # Se la prima colonna si chiama '0', significa che l'header è andato perso
+            if '0' in temp_df.columns:
+                 # Ripristiniamo i nomi delle colonne dal dataframe processato
+                 temp_df.columns = df_processed.columns
+                 temp_df.to_csv(path, index=False)
+                 print(f"✅ Header ripristinati per {h}")
+    
+    print("\n✨ Rigenerazione completata correttamente.")
 
 if __name__ == "__main__":
     main()
-

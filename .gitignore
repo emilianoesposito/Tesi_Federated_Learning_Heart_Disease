@@ -1,45 +1,33 @@
-# --- Python ---
-# Esclude i file compilati e le cache di esecuzione
+# --- Python & Ambiente ---
 __pycache__/
 *.py[cod]
-*$py.class
 .venv/
 venv/
-ENV/
-dist/
-build/
-*.so
+.env
 
-# --- Dati e Dataset (Privacy e Performance) ---
-# Escludiamo i file CSV pesanti e i dati processati
-# Il professore genererà questi file eseguendo i tuoi script
-data/raw/*.csv
+# --- Dati e Dataset ---
+# Escludiamo i CSV generati (verranno ricreati dagli script 01 e 03)
 data/processed/*.csv
-!data/processed/.gitkeep
 data/federated/*.csv
+# Manteniamo il dataset originale (opzionale)
+# !data/raw/Dataset_Pazienti.csv
 
-
-# --- Modelli di Machine Learning ---
-# I modelli salvati (.joblib o .pkl) possono essere pesanti
-# Verranno rigenerati dallo script 03 sul PC del docente
+# --- Modelli e Scaler ---
+# Escludiamo i file binari pesanti
 *.joblib
 *.pkl
-models/
+results/global_scaler.joblib
+results/federated/*.joblib
+results/federated_privacy/*.joblib
 
-# --- Risultati e Output Locali ---
-# Escludiamo i report e i grafici generati localmente
-# Questo permette al docente di verificare che il codice funzioni producendone di nuovi
-results/*.csv
-results/*.png
-results/visualizations/*.png
+# --- Risultati e Output ---
+# Escludiamo i grafici e i log (possono essere rigenererati eseguendo gli script)
+results/**/*.png
+results/**/*.json
+*.log
 
-# --- Configurazioni IDE e Sistema ---
-# Esclude impostazioni personali di editor e file spazzatura del sistema operativo
+# --- IDE e Sistema ---
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-*.log
-
-# --- Jupyter Notebooks ---
-.ipynb_checkpoints

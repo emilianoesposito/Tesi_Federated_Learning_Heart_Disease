@@ -2,93 +2,80 @@
 # -*- coding: utf-8 -*-
 """
 Script: 03_train_models.py
-Description: Addestramento della Baseline con MLP e LightGBM.
-             Include il bilanciamento SMOTE e il calcolo delle metriche richieste.
+Description: Addestramento della Baseline globale con MLP e LightGBM.
+             Utilizza le utility per il pre-processing e il monitoraggio risorse.
 Output: 
- - Modelli salvati in 'results'
- - Tabella riassuntiva 'results/metrics_summary.csv'          
+ - Modelli e Scaler salvati in 'results/'
+ - Metriche salvate in 'results/metrics_summary.csv'          
 """
 
 import sys
 import os
 import joblib 
 import pandas as pd
-import numpy as np 
-from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier 
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, classification_report
-from imblearn.over_sampling import SMOTE
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 import lightgbm as lgb
 
-# Aggiunta root progetto
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Fix per i percorsi
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-TRAINING_FILE = 'data/processed/Enhanced_Training_Dataset.csv'
-RESULTS_DIR = 'results'
-os.makedirs(RESULTS_DIR, exist_ok=True)
+from utils.feature_engineering import prepare_data_for_training
 
-def train_baseline():
-    if not os.path.exists(TRAINING_FILE):
-        print(f"❌ Errore: File {TRAINING_FILE} non trovato. Esegui lo script 01.")
+def main():
+    print("🧠 Addestramento Modelli Baseline (Globale)...")
+    
+    # 1. Caricamento dati
+    input_path = "data/processed/Enhanced_Training_Dataset.csv"
+    if not os.path.exists(input_path):
+        print(f"❌ Errore: File {input_path} non trovato!")
         return
     
-    # 1. Caricamento Dati
-    print("📥 Caricamento dataset per la Baseline...")
-    df = pd.read_csv(TRAINING_FILE)
+    df = pd.read_csv(input_path)
+    X_train, X_test, y_train, y_test, scaler = prepare_data_for_training(df)
+    
+    # Crea cartella risultati
+    os.makedirs("results", exist_ok=True)
+    
+    # Salva lo scaler (fondamentale per dopo!)
+    joblib.dump(scaler, "results/global_scaler.joblib")
+    
+    metrics_list = []
 
-    # Definizione feature (le 13 variabili cliniche) e Target
-    X = df.drop(columns=['target_label', 'outcome'], errors='ignore')
-    y = df['target_label']
+    # 2. Addestramento MLP (Rete Neurale)
+    print("🚀 Training MLP...")
+    mlp = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=1000, random_state=42)
+    mlp.fit(X_train, y_train)
+    y_pred_mlp = mlp.predict(X_test)
+    
+    metrics_list.append({
+        'model': 'MLP',
+        'accuracy': accuracy_score(y_test, y_pred_mlp),
+        'f1_score': f1_score(y_test, y_pred_mlp)
+    })
+    joblib.dump(mlp, "results/MLP.joblib")
 
-    # 2. Split e Bilanciamento
-    # Usiamo lo split standard 80/20 prima della partizione federata
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # 3. Addestramento LightGBM
+    print("🚀 Training LightGBM...")
+    lgbm = lgb.LGBMClassifier(n_estimators=100, random_state=42, verbose=-1)
+    lgbm.fit(X_train, y_train)
+    y_pred_lgbm = lgbm.predict(X_test)
+    
+    metrics_list.append({
+        'model': 'LightGBM',
+        'accuracy': accuracy_score(y_test, y_pred_lgbm),
+        'f1_score': f1_score(y_test, y_pred_lgbm)
+    })
+    joblib.dump(lgbm, "results/LightGBM.joblib")
 
-    print(f"⚖️ Applicazione SMOTE per bilanciare i {len(X_train)} record di training...")
-    smote = SMOTE(random_state=42)
-    X_res, y_res = smote.fit_resample(X_train, y_train)
-    print(f"✅ Bilanciamento completato: {len(X_res)} campioni generati.")
-
-    # 3. Definizione Modelli (MLP e LightGBM)
-    models = {
-        'MLP_Baseline': MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=500, random_state=42),
-        'LightGBM_Baseline': lgb.LGBMClassifier(n_estimators=100, learning_rate=0.05, random_state=42)
-    }
-
-    metrics_rows = []
-
-    # 4. Training e Valutazione
-    for name, model in models.items():
-        print(f"🚀 Addestramento modello: {name}...")
-        model.fit(X_res, y_res)
-
-        # Predizioni
-        y_pred = model.predict(X_test)
-        y_prob = model.predict_proba(X_test)[:, 1]
-
-        # Calcolo Metriche 
-        acc = accuracy_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-        roc = roc_auc_score(y_test, y_prob)
-
-        print(f"📊 Risultati {name}: Acc={acc:.2f}, F1={f1:.2f}, ROC-AUC={roc:.2f}")
-
-        metrics_rows.append({
-            'model': name,
-            'accuracy': round(acc, 4),
-            'f1_score': round(f1, 4),
-            'roc_auc': round(roc, 4)
-        })
-
-        # Salvataggio modello
-        joblib.dump(model, os.path.join(RESULTS_DIR, f"{name}.joblib"))
-
-    # 5. Salvataggio Report Finale
-    df_metrics = pd.DataFrame(metrics_rows)
-    df_metrics.to_csv(os.path.join(RESULTS_DIR, 'metrics_summary.csv'), index=False)
-    print(f"✅ Baseline completata. Risultati salvati in {RESULTS_DIR}/metrics_summary.csv")
+    # 4. Salvataggio Metriche per lo script 04
+    df_metrics = pd.DataFrame(metrics_list)
+    df_metrics.to_csv("results/metrics_summary.csv", index=False)
+    
+    print("\n✅ Modelli salvati e 'results/metrics_summary.csv' generato!")
 
 if __name__ == "__main__":
-    train_baseline()
-
-
+    main()
