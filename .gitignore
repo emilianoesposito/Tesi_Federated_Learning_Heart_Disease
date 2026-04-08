@@ -9,6 +9,7 @@ venv/
 # Escludiamo i CSV generati (verranno ricreati dagli script 01 e 03)
 data/processed/*.csv
 data/federated/*.csv
+results/*.csv 
 # Manteniamo il dataset originale (opzionale)
 # !data/raw/Dataset_Pazienti.csv
 
@@ -16,7 +17,7 @@ data/federated/*.csv
 # Escludiamo i file binari pesanti
 *.joblib
 *.pkl
-results/global_scaler.joblib
+results/*.joblib 
 results/federated/*.joblib
 results/federated_privacy/*.joblib
 
