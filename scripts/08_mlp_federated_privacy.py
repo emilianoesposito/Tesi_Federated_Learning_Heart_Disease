@@ -1,112 +1,112 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Script: 08_mlp_federated_privacy.py
-Descrizione: Aggregazione Federata dei modelli MLP con protocolli di Privacy.
-             Implementa Secure Aggregation (Shamir's Secret Sharing) e 
-             Differential Privacy (RDP) sui pesi aggregati.
-Output: 
- - Modello globale protetto in 'results/federated_privacy/global_model_privacy.joblib'
- - Report di privacy in 'results/federated_privacy/privacy_report.json'
-"""
-
 import sys
 import os
 import joblib
 import pandas as pd
 import numpy as np
 import json
+import warnings
 from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score, f1_score
 
-# Aggiunta root per importare i moduli dalla cartella utils
+# SILENZIAMO I WARNING (Corretto in filterwarnings)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+
+# Root per utility
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.enhanced_shamir_privacy import SecureAggregationProtocol, ShamirConfig, DifferentialPrivacyConfig
 
-from utils.enhanced_shamir_privacy import (
-    ShamirConfig, 
-    DifferentialPrivacyConfig, 
-    SecureAggregationProtocol
-)
-
-# === Configurazione Percorsi ===
+# Percorsi
 INPUT_MODELS = "results/federated/local_mlp_models.joblib"
+TEST_SET_PATH = "data/test/global_test_set.csv"
+SCALER_PATH = "results/global_scaler.joblib"
 RESULTS_DIR = "results/federated_privacy"
 
+def extract_params(item):
+    """Estrae i pesi indipendentemente dal formato di salvataggio."""
+    if hasattr(item, 'coefs_'):
+        return list(item.coefs_) + list(item.intercepts_)
+    if isinstance(item, dict):
+        if 'model' in item and hasattr(item['model'], 'coefs_'):
+            return list(item['model'].coefs_) + list(item['model'].intercepts_)
+        if 'weights' in item:
+            return item['weights']
+    return None
+
 def main():
-    print("🛡️ Fase 08: Aggregazione Sicura e Privacy Differenziale (DP + SSS)...")
-    
-    if not os.path.exists(INPUT_MODELS):
-        print(f"❌ Errore: Modelli locali non trovati in {INPUT_MODELS}.")
-        print("💡 Esegui prima lo script '07_mlp_federated_training.py'.")
-        return
-    
+    print("🛡️ Fase 08: Analisi Trade-off Privacy (DP + SSS)")
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    # 1. Caricamento dei modelli locali (prodotti dallo script 07)
-    local_data_list = joblib.load(INPUT_MODELS)
-    num_nodes = len(local_data_list)
-    total_samples = sum(item['size'] for item in local_data_list)
+    if not os.path.exists(INPUT_MODELS):
+        print(f"❌ Errore: Manca {INPUT_MODELS}"); return
 
-    # 2. Configurazione Protocolli di Privacy (da utils)
-    # Threshold=3 significa che servono almeno 3 ospedali onesti per ricostruire il segreto
-    shamir_cfg = ShamirConfig(threshold=3, num_participants=num_nodes)
-    dp_cfg = DifferentialPrivacyConfig(epsilon_total=1.0, delta=1e-5)
+    # 1. Caricamento e Estrazione
+    local_data = joblib.load(INPUT_MODELS)
+    cleaned_weights = []
     
-    protocol = SecureAggregationProtocol(shamir_cfg, dp_cfg)
+    items = local_data.values() if isinstance(local_data, dict) else local_data
+    for item in items:
+        p = extract_params(item)
+        if p: cleaned_weights.append([np.array(layer) for layer in p])
 
-    # 3. Estrazione e Pesatura dei Parametri (FedAvg)
-    # Estraiamo i coefficienti (coefs_) e le intercettazioni (intercepts_) di ogni MLP
-    weighted_params_list = []
+    num_nodes = len(cleaned_weights)
+    if num_nodes == 0:
+        print("❌ Nessun parametro trovato."); return
     
-    print(f"🔐 Preparazione pesi per {num_nodes} nodi (Record totali: {total_samples})...")
+    print(f"✅ Estratti parametri per {num_nodes} partecipanti.")
 
-    for item in local_data_list:
-        model = item['model']
-        weight = item['size'] / total_samples  # Peso proporzionale alla dimensione del dataset
+    # 2. Caricamento Dati Test
+    df_test = pd.read_csv(TEST_SET_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    X_test = scaler.transform(df_test.drop(columns=['target_label']))
+    y_test = df_test['target_label']
+
+    epsilons = [None, 0.5, 1.0, 2.0, 5.0, 10.0]
+    results = []
+
+    # 3. Ciclo di Aggregazione e Test
+    for eps in epsilons:
+        eps_label = eps if eps is not None else "No_Privacy"
+        print(f"--- Testando ε: {eps_label} ---")
+
+        actual_eps = eps if eps is not None else 1e6
+        protocol = SecureAggregationProtocol(
+            shamir_cfg=ShamirConfig(num_participants=num_nodes),
+            dp_cfg=DifferentialPrivacyConfig(epsilon_total=actual_eps)
+        )
         
-        # Concateniamo tutti i pesi della rete in un unico vettore piatto per il protocollo SSS
-        params = model.coefs_ + model.intercepts_
-        weighted_params = [p * weight for p in params]
-        weighted_params_list.append(weighted_params)
+        try:
+            # AGGREGAZIONE + CORREZIONE MEDIA (FedAvg reale)
+            raw_sum_params = protocol.aggregate(cleaned_weights)
+            global_params = [layer / num_nodes for layer in raw_sum_params]
+            
+            # Ricostruzione Modello
+            model = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=1)
+            model.fit(X_test[:10], y_test[:10]) 
 
-    # 4. Esecuzione Aggregazione Sicura
-    # Questa funzione applica Shamir, maschera i dati e aggiunge rumore DP calibrato
-    print("⚖️ Esecuzione Secure Aggregation e calibrazione rumore DP...")
-    global_params = protocol.aggregate(weighted_params_list)
+            # Iniezione Pesi
+            n_coefs = len(model.coefs_)
+            for i in range(n_coefs):
+                model.coefs_[i] = global_params[i]
+            for i in range(len(model.intercepts_)):
+                model.intercepts_[i] = global_params[n_coefs + i].ravel()
 
-    # 5. Ricostruzione del Modello MLP Globale
-    # Usiamo un modello template con la stessa architettura (64, 32)
-    global_model = MLPClassifier(hidden_layer_sizes=(64, 32), random_state=42)
-    
-    # Inizializzazione fittizia per creare la struttura dei pesi (13 feature UCI)
-    global_model.fit(np.zeros((1, 13)), np.array([0]))
-    
-    # Iniezione dei parametri aggregati nel modello globale
-    num_layers = len(global_model.coefs_)
-    global_model.coefs_ = global_params[:num_layers]
-    global_model.intercepts_ = global_params[num_layers:]
+            # Valutazione
+            y_pred = model.predict(X_test)
+            acc = accuracy_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred)
+            
+            print(f"   📊 Risultato -> Acc: {acc:.4f} | F1: {f1:.4f}")
+            results.append({"epsilon": str(eps_label), "accuracy": float(acc), "f1_score": float(f1)})
+            
+        except Exception as e:
+            print(f"   ⚠️ Errore: {e}")
 
-    # 6. Salvataggio Modello Finale e Report
-    model_path = os.path.join(RESULTS_DIR, "global_model_privacy.joblib")
-    joblib.dump(global_model, model_path)
-    
-    report = {
-        "status": "SUCCESS",
-        "nodes": num_nodes,
-        "total_records": total_samples,
-        "privacy_config": {
-            "epsilon": dp_cfg.epsilon_total,
-            "shamir_threshold": shamir_cfg.threshold
-        },
-        "output_model": model_path
-    }
-    
-    with open(os.path.join(RESULTS_DIR, "privacy_report.json"), "w") as f:
-        json.dump(report, f, indent=4)
-
-    print("-" * 60)
-    print(f"✅ Aggregazione completata con successo.")
-    print(f"💾 Modello globale salvato in: {model_path}")
-    print(f"📑 Report di privacy disponibile in: {RESULTS_DIR}/privacy_report.json")
+    # 4. Salvataggio
+    with open(os.path.join(RESULTS_DIR, "federated_privacy_comparison.json"), "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"\n✅ Analisi completata. Risultati in {RESULTS_DIR}")
 
 if __name__ == "__main__":
     main()

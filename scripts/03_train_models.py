@@ -2,80 +2,53 @@
 # -*- coding: utf-8 -*-
 """
 Script: 03_train_models.py
-Description: Addestramento della Baseline globale con MLP e LightGBM.
-             Utilizza le utility per il pre-processing e il monitoraggio risorse.
-Output: 
- - Modelli e Scaler salvati in 'results/'
- - Metriche salvate in 'results/metrics_summary.csv'          
+Descrizione: Addestramento della Baseline globale. 
+             CORREZIONE: Valutazione sul Test Set Globale (20%) separato nello Script 01.
 """
 
-import sys
-import os
-import joblib 
+import sys, os, joblib
 import pandas as pd
 from sklearn.neural_network import MLPClassifier 
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score
 import lightgbm as lgb
+from sklearn.preprocessing import StandardScaler
 
-# Fix per i percorsi
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-from utils.feature_engineering import prepare_data_for_training
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def main():
-    print("🧠 Addestramento Modelli Baseline (Globale)...")
+    train_path = "data/processed/Enhanced_Training_Dataset.csv"
+    test_path = "data/test/global_test_set.csv"
     
-    # 1. Caricamento dati
-    input_path = "data/processed/Enhanced_Training_Dataset.csv"
-    if not os.path.exists(input_path):
-        print(f"❌ Errore: File {input_path} non trovato!")
-        return
-    
-    df = pd.read_csv(input_path)
-    X_train, X_test, y_train, y_test, scaler = prepare_data_for_training(df)
-    
-    # Crea cartella risultati
+    df_train = pd.read_csv(train_path)
+    df_test = pd.read_csv(test_path)
+
+    X_train, y_train = df_train.drop('target_label', axis=1), df_train['target_label']
+    X_test, y_test = df_test.drop('target_label', axis=1), df_test['target_label']
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
     os.makedirs("results", exist_ok=True)
-    
-    # Salva lo scaler (fondamentale per dopo!)
     joblib.dump(scaler, "results/global_scaler.joblib")
     
-    metrics_list = []
-
-    # 2. Addestramento MLP (Rete Neurale)
-    print("🚀 Training MLP...")
+    metrics = []
+    # MLP
     mlp = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=1000, random_state=42)
-    mlp.fit(X_train, y_train)
-    y_pred_mlp = mlp.predict(X_test)
-    
-    metrics_list.append({
-        'model': 'MLP',
-        'accuracy': accuracy_score(y_test, y_pred_mlp),
-        'f1_score': f1_score(y_test, y_pred_mlp)
-    })
+    mlp.fit(X_train_scaled, y_train)
+    y_pred = mlp.predict(X_test_scaled)
+    metrics.append({'model': 'MLP', 'accuracy': accuracy_score(y_test, y_pred), 'f1_score': f1_score(y_test, y_pred)})
     joblib.dump(mlp, "results/MLP.joblib")
 
-    # 3. Addestramento LightGBM
-    print("🚀 Training LightGBM...")
+    # LightGBM
     lgbm = lgb.LGBMClassifier(n_estimators=100, random_state=42, verbose=-1)
-    lgbm.fit(X_train, y_train)
-    y_pred_lgbm = lgbm.predict(X_test)
-    
-    metrics_list.append({
-        'model': 'LightGBM',
-        'accuracy': accuracy_score(y_test, y_pred_lgbm),
-        'f1_score': f1_score(y_test, y_pred_lgbm)
-    })
+    lgbm.fit(X_train_scaled, y_train)
+    y_pred = lgbm.predict(X_test_scaled)
+    metrics.append({'model': 'LightGBM', 'accuracy': accuracy_score(y_test, y_pred), 'f1_score': f1_score(y_test, y_pred)})
     joblib.dump(lgbm, "results/LightGBM.joblib")
 
-    # 4. Salvataggio Metriche per lo script 04
-    df_metrics = pd.DataFrame(metrics_list)
-    df_metrics.to_csv("results/metrics_summary.csv", index=False)
-    
-    print("\n✅ Modelli salvati e 'results/metrics_summary.csv' generato!")
+    pd.DataFrame(metrics).to_csv("results/metrics_summary.csv", index=False)
+    print("✅ Baseline addestrata e valutata su Test Set Globale.")
 
 if __name__ == "__main__":
     main()

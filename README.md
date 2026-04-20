@@ -1,61 +1,76 @@
 # Privacy-Preserving Cardiac Monitoring
-_Architettura Federata con Privacy Differenziale, Shamir's Secret Sharing e Notarizzazione Blockchain_
+### _Architettura Federata con Privacy Differenziale, Shamir's Secret Sharing e Notarizzazione Blockchain_
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Project%20Completed-success" />
-  <img src="https://img.shields.io/badge/AI-Federated%20Learning-blueviolet" />
-  <img src="https://img.shields.io/badge/Privacy-Differential%20Privacy-green" />
-  <img src="https://img.shields.io/badge/Security-Shamir%20SSS-orange" />
-  <img src="https://img.shields.io/badge/Integrity-Blockchain-blue" />
+  <img src="https://img.shields.io/badge/Status-Project%20Validated-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python" />
+  <img src="https://img.shields.io/badge/Framework-Scikit--Learn-orange?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Privacy-Differential%20Privacy-green?style=for-the-badge" />
 </p>
 
-## 🚀 Panoramica del Progetto
-Questo progetto sviluppa un sistema avanzato di monitoraggio cardiaco che risolve il conflitto tra analisi dei dati (AI) e riservatezza del paziente (GDPR). Invece di centralizzare dati sensibili, il sistema utilizza il **Federated Learning** per addestrare i modelli localmente negli ospedali, proteggendo i pesi con **Privacy Differenziale** e garantendo l'integrità tramite **Blockchain**.
+---
 
-## 🛠️ Architettura Tecnica
-Il sistema si basa su tre pilastri fondamentali:
-1. **Federated Learning (Non-IID)**: Simulazione di 5 nodi ospedalieri con distribuzioni di dati eterogenee.
-2. **Secure Aggregation & DP**: Protocollo basato su *Shamir's Secret Sharing* per l'aggregazione dei pesi e rumore di Laplace (Differential Privacy) per l'anonimizzazione.
-3. **Blockchain Anchoring**: Notarizzazione del *Merkle Root* dei record clinici per garantire l'immutabilità dei log diagnostici.
+## 🚀 Panoramica del Progetto
+Questo progetto implementa un'architettura avanzata per il monitoraggio cardiaco, progettata per rispettare le normative GDPR pur mantenendo elevate capacità predittive. Il sistema risolve il problema della centralizzazione dei dati sensibili utilizzando il **Federated Learning**, dove il modello "viaggia" verso i dati e non viceversa.
+
+### I Tre Pilastri della Sicurezza:
+1.  **Federated Learning (Non-IID):** Addestramento distribuito su 5 nodi ospedalieri con distribuzioni di dati eterogenee.
+2.  **Differential Privacy (DP) & Shamir SSS:** Protezione dei gradienti tramite rumore statistico e scomposizione dei segreti per impedire attacchi di inversione del modello.
+3.  **Blockchain Notarization:** Garanzia di immutabilità dei log clinici e dei risultati tramite Merkle Tree e hashing SHA-256.
+
+---
+
+## 🛠️ Novità e Correzioni (Revisione Finale)
+* **Metric Correction:** Risolto il bug di iniezione pesi nello Script 08. Ora il modello globale viene ricostruito rispettando il broadcasting dei bias, stabilizzando l'**F1-Score** a valori reali (~0.81).
+* **Scientific Visualization:** Implementata la **scala logaritmica** per l'analisi del budget di privacy ($\epsilon$), permettendo una valutazione precisa del trade-off Utility/Privacy.
+* **Methodological Rigor:** Introduzione di un **Test Set Globale (20%)** isolato all'origine (Script 01) per garantire che le metriche finali non siano affette da bias locali.
+
+---
 
 ## 📂 Struttura della Pipeline
-Eseguire gli script in ordine numerico per replicare l'intero esperimento:
+Gli script sono numerati per riflettere l'ordine logico del workflow scientifico:
 
-1. `01_generate_dataset.py`: Preparazione dati e split federato tra i nodi.
-2. `02_visualize_dataset.py`: Analisi esplorativa dei dati (EDA).
-3. `03_train_models.py`: Training della Baseline centralizzata (LightGBM vs MLP).
-4. `05_LightGBM_federated_training.py`: Addestramento federato tramite LightGBM.
-5. `06_LightGBM_federated_visualization.py`: Visualizzazione della distribuzione Non-IID tra gli ospedali.
-6. `07_mlp_federated_training.py`: Preparazione dei modelli MLP per l'aggregazione sicura.
-7. `08_mlp_federated_privacy.py`: **[CORE]** Aggregazione sicura con Shamir e Privacy Differenziale.
-8. `09_mlp_federated_privacy_visualization.py`: Analisi del trade-off tra Utilità e Privacy.
-9. `10_blockchain_anchoring_bench.py`: Benchmark di scalabilità della notarizzazione Blockchain.
+1.  `01_generate_dataset.py`: Pre-processing, scoring clinico e creazione del Test Set Globale.
+2.  `02_visualize_dataset.py`: Analisi esplorativa dei dati (EDA) e correlazioni.
+3.  `03_train_models.py`: Creazione della **Baseline Centralizzata** (MLP e LightGBM).
+4.  `04_analyze_results.py`: Generazione grafici comparativi della baseline.
+5.  `05_LightGBM_federated_training.py`: Simulazione del training federato locale.
+6.  `06_LightGBM_federated_visualization.py`: Analisi visiva della distribuzione Non-IID tra i nodi.
+7.  `07_mlp_federated_training.py`: Training locale dei modelli MLP per l'aggregazione.
+8.  **`08_mlp_federated_privacy.py`**: [CORE] Aggregazione sicura con SSS e iniezione DP.
+9.  `09_mlp_federated_privacy_visualization.py`: Plotting del trade-off in scala logaritmica.
+10. `10_blockchain_anchoring_bench.py`: Benchmark di scalabilità della notarizzazione.
 
-## 📈 Risultati Ottenuti
-I test eseguiti sul dataset UCI Heart Disease hanno prodotto i seguenti risultati:
+---
 
-| Scenario | Modello | Accuracy | F1-Score |
-| :--- | :--- | :--- | :--- |
-| **Centralizzato** | MLP (Baseline) | **83.6%** | **84.4%** |
-| **Federato** | MLP (No Privacy) | 81.6% | 81.4% |
-| **Sicuro** | MLP (DP + Shamir) | 77.6% | 76.4% |
+## 📈 Risultati di Validazione
+I test aggiornati dimostrano che l'architettura mantiene un'ottima utilità clinica anche sotto stringenti vincoli di privacy:
 
-**Nota sulla Privacy:** Il calo di circa il 6% nell'accuratezza è il "costo della privacy" (Epsilon=1.0), necessario per garantire che nessun dato individuale possa essere estratto dal modello globale.
+| Scenario | Modello | Accuracy | F1-Score | Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **Centralizzato** | MLP Baseline | 83.6% | 0.84 | Limite superiore teorico |
+| **Federato** | MLP (No Privacy) | 77.0% | 0.80 | Perdita dovuta a Non-IID |
+| **Protetto** | **MLP (DP $\epsilon=1.0$)** | **78.7%** | **0.81** | **Configurazione Ottimale** |
 
-## 🔗 Performance Blockchain
-Il sistema di notarizzazione ha dimostrato un'altissima efficienza:
-- **Tempo di notarizzazione (303 record)**: < 0.005s.
-- **Scalabilità**: < 0.1s per 10.000 record clinici.
-- **Impatto CPU**: ~0.0% (operazione estremamente leggera).
+> **Analisi:** Il "costo della privacy" è minimo rispetto ai benefici di sicurezza ottenuti, con un F1-score che si mantiene stabilmente sopra lo 0.80.
 
-## ⚙️ Setup e Installazione
+---
+
+## 💻 Installazione e Utilizzo
+
+### 1. Requisiti
+* Python 3.9 o superiore
+* Pip (Python package manager)
+
+### 2. Setup Ambiente
 ```bash
-# Clone del repository
-git clone [URL_DEL_TUO_REPO]
+# Clonare il repository
+git clone <tuo-url-repository>
+cd privacy-preserving-cardiac-monitoring
 
-# Creazione ambiente virtuale
+# Creare un ambiente virtuale
 python -m venv venv
 source venv/bin/activate  # Su Windows: venv\Scripts\activate
 
-# Installazione dipendenze
+# Installare le dipendenze
 pip install -r requirements.txt

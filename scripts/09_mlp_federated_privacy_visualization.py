@@ -1,85 +1,58 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Script: 09_mlp_federated_privacy_visualization.py
-Descrizione: Analisi comparativa del trade-off tra Utility e Privacy.
-             Confronta le performance tra Baseline Centralizzata, 
-             Federato (No Privacy) e Federato (DP + Shamir).
-Output: Plot PNG in 'results/federated_privacy/privacy_impact_comparison.png'
-"""
-
 import os
 import sys
 import pandas as pd
-import joblib
-
-# Fix per i percorsi su Windows
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-from utils.visualization import visualize_metrics_comparison
-
-# === Configurazione Percorsi ===
-METRICS_BASELINE = "results/metrics_summary.csv"
-OUTPUT_DIR = "results/federated_privacy"
+import json
+import matplotlib.pyplot as plt
 
 def main():
-    print("📊 Fase 09: Analisi dell'impatto della Privacy sulle Performance...")
+    RESULTS_DIR = "results/federated_privacy"
+    INPUT_PATH = os.path.join(RESULTS_DIR, "federated_privacy_comparison.json")
+    OUTPUT_DIR = "results/visualizations"
+    
+    if not os.path.exists(INPUT_PATH):
+        print(f"❌ Errore: Manca il file {INPUT_PATH}. Esegui lo script 08!"); return
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    results = []
-
-    # 1. Caricamento Baseline Reale (dal tuo Script 03)
-    if os.path.exists(METRICS_BASELINE):
-        df_base = pd.read_csv(METRICS_BASELINE)
-        # Cerchiamo 'MLP' (il nome usato nello script 03)
-        if 'MLP' in df_base['model'].values:
-            mlp_data = df_base[df_base['model'] == 'MLP'].iloc[0]
-            results.append({
-                'Scenario': 'Centralizzato (Baseline)',
-                'accuracy': mlp_data['accuracy'],
-                'f1_score': mlp_data['f1_score']
-            })
-    else:
-        print("⚠️ Baseline non trovata, uso valori di default.")
-        results.append({'Scenario': 'Centralizzato (Baseline)', 'accuracy': 0.83, 'f1_score': 0.84})
-
-    # 2. Scenario Federato (No Privacy)
-    # Stimiamo un calo minimo dovuto alla distribuzione Non-IID
-    results.append({
-        'Scenario': 'Federato (No Privacy)',
-        'accuracy': results[0]['accuracy'] - 0.02, 
-        'f1_score': results[0]['f1_score'] - 0.03
-    })
-
-    # 3. Scenario Federato con Privacy (DP + Shamir)
-    # Il rumore della Differential Privacy tipicamente abbassa ulteriormente le performance
-    results.append({
-        'Scenario': 'Federato (DP + Shamir)',
-        'accuracy': results[0]['accuracy'] - 0.06, 
-        'f1_score': results[0]['f1_score'] - 0.08
-    })
-
-    df_comparison = pd.DataFrame(results)
-
-    # Visualizzazione
-    print("\n📈 Confronto Performance:")
-    print(df_comparison.to_string(index=False))
+    with open(INPUT_PATH, "r") as f:
+        data = json.load(f)
     
-    print("\n🎨 Generazione del grafico comparativo Utility vs Privacy...")
-    
-    # Rinominiamo per la funzione di visualizzazione
-    df_comparison = df_comparison.rename(columns={'Scenario': 'model'})
-    
-    visualize_metrics_comparison(
-        df_comparison,
-        save_dir=OUTPUT_DIR,
-        output_name="privacy_impact_comparison.png"
-    )
+    df = pd.DataFrame(data)
 
-    print(f"\n✅ Analisi completata. Grafico salvato in: {OUTPUT_DIR}/privacy_impact_comparison.png")
+    # 1. Separazione Baseline (No_Privacy) e dati DP
+    df['eps_num'] = pd.to_numeric(df['epsilon'], errors='coerce')
+    df_dp = df.dropna(subset=['eps_num']).sort_values('eps_num')
+    
+    # Recupero valore No_Privacy per la linea orizzontale
+    no_priv_data = df[df['epsilon'] == 'No_Privacy']
+    
+    # 2. Creazione Grafico
+    plt.figure(figsize=(10, 6))
+    
+    # Linee per Accuratezza e F1 con Differential Privacy
+    plt.plot(df_dp['eps_num'], df_dp['accuracy'], marker='o', label='Accuracy (DP)', linewidth=2, color='#1f77b4')
+    plt.plot(df_dp['eps_num'], df_dp['f1_score'], marker='s', label='F1-Score (DP)', linewidth=2, linestyle='--', color='#ff7f0e')
+
+    # Linea di riferimento Baseline (No Privacy)
+    if not no_priv_data.empty:
+        plt.axhline(y=no_priv_data['accuracy'].values[0], color='green', linestyle=':', alpha=0.6, label='Baseline Accuracy (No Privacy)')
+        plt.axhline(y=no_priv_data['f1_score'].values[0], color='red', linestyle=':', alpha=0.6, label='Baseline F1 (No Privacy)')
+
+    # Formattazione Assi
+    plt.xscale('log')
+    # Forza le etichette dell'asse X a mostrare i nostri epsilon esatti
+    tick_values = df_dp['eps_num'].tolist()
+    plt.xticks(tick_values, labels=[str(v) for v in tick_values])
+    
+    plt.xlabel('Privacy Budget (ε) - Scala Logaritmica')
+    plt.ylabel('Score (0.0 - 1.0)')
+    plt.title('Trade-off Privacy vs Utility (Federated MLP)')
+    plt.legend(loc='lower right')
+    plt.grid(True, which="both", ls="-", alpha=0.2)
+    plt.ylim(0, 1.0) # Opzionale: fissa l'asse Y tra 0 e 1 per chiarezza tesi
+
+    save_path = os.path.join(OUTPUT_DIR, "federated_privacy_tradeoff.png")
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"✅ Grafico salvato con successo in: {save_path}")
 
 if __name__ == "__main__":
     main()

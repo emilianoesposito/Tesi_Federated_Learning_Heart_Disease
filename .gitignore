@@ -6,29 +6,23 @@ venv/
 .env
 
 # --- Dati e Dataset ---
-# Escludiamo i CSV generati (verranno ricreati dagli script 01 e 03)
+# Escludiamo tutti i CSV generati e la cartella raw
 data/processed/*.csv
 data/federated/*.csv
-results/*.csv 
-# Manteniamo il dataset originale (opzionale)
-# !data/raw/Dataset_Pazienti.csv
+data/test/*.csv
+data/raw/*.csv
 
-# --- Modelli e Scaler ---
-# Escludiamo i file binari pesanti
+# --- Modelli e File Binari ---
 *.joblib
 *.pkl
-results/*.joblib 
-results/federated/*.joblib
-results/federated_privacy/*.joblib
 
-# --- Risultati e Output ---
-# Escludiamo i grafici e i log (possono essere rigenererati eseguendo gli script)
-results/**/*.png
-results/**/*.json
-*.log
+# --- Risultati (IGNORATI COMPLETAMENTE) ---
+# Esclude la cartella results e tutto il suo contenuto
+results/
 
 # --- IDE e Sistema ---
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+*.log
